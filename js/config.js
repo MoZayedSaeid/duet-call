@@ -17,4 +17,11 @@
 //
 // Note: these values are visible to anyone who opens the site.
 
-export const TURN_SERVERS = [];
+export const TURN_SERVERS = [
+  {
+    // ExpressTURN free tier
+    urls: ['turn:free.expressturn.com:3478', 'turn:free.expressturn.com:3478?transport=tcp'],
+    username: '000000002108416451',
+    credential: 'S+jElkRZROQGhgGhBJ8vTY+Y2Mk=',
+  },
+];
