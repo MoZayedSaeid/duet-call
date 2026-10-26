@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob: mediastream:; connect-src 'self' wss://broker.emqx.io:8084 wss://broker.hivemq.com:8884 wss://broker-cn.emqx.io:8084; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#0b0d12">
+  <meta name="description" content="Private, peer-to-peer HD voice calls in your browser. No accounts, no servers, works on slow connections.">
+  <title>Duet · private P2P voice calls</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <main id="app">
+
+    <!-- HOME -->
+    <section id="home" class="screen active">
+      <header class="brand">
+        <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 16 0" /><path d="M7 12a5 5 0 0 1 10 0" /><circle cx="12" cy="12" r="2" /><path d="M12 14v6" /></svg></div>
+        <div>
+          <h1>Duet</h1>
+          <p class="muted">Private peer-to-peer voice calls</p>
+        </div>
+      </header>
+
+      <button id="startBtn" class="btn primary big">
+        <svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" /></svg>
+        Start a call
+      </button>
+
+      <div class="card">
+        <label for="joinInput" class="label">Have an invite?</label>
+        <div class="row">
+          <input id="joinInput" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste link or code">
+          <button id="joinBtn" class="btn">Join</button>
+        </div>
+      </div>
+
+      <button class="card quality-pick" data-open-quality>
+        <span>
+          <span class="label">Call quality</span>
+          <strong data-quality-name>Auto</strong>
+          <span class="muted small" data-quality-hint></span>
+        </span>
+        <svg class="chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" /></svg>
+      </button>
+
+      <details class="card settings">
+        <summary>Settings</summary>
+        <label class="toggle"><input type="checkbox" id="optNs" checked><span>Noise suppression</span></label>
+        <label class="toggle"><input type="checkbox" id="optEc" checked><span>Echo cancellation</span></label>
+        <label class="toggle"><input type="checkbox" id="optAgc" checked><span>Auto volume (AGC)</span></label>
+        <p class="label spaced">TURN relay <span class="muted">(optional, only for very strict networks)</span></p>
+        <input id="turnUrl" type="text" placeholder="turns:turn.example.com:443" autocomplete="off" spellcheck="false">
+        <div class="row">
+          <input id="turnUser" type="text" placeholder="Username" autocomplete="off" spellcheck="false">
+          <input id="turnPass" type="password" placeholder="Credential" autocomplete="off">
+        </div>
+      </details>
+
+      <button id="privateBtn" class="btn ghost">
+        <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+        Private mode (no relay at all)
+      </button>
+
+      <footer class="muted small foot">
+        Audio flows directly between you, encrypted end-to-end with DTLS-SRTP.
+        Nothing is stored. No accounts.
+      </footer>
+    </section>
+
+    <!-- INVITED -->
+    <section id="invite" class="screen">
+      <div class="center-stack">
+        <div class="avatar idle"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg></div>
+        <h2>You're invited to a call</h2>
+        <p class="muted">Your microphone is only used once you join.</p>
+        <button id="acceptBtn" class="btn primary big">Join call</button>
+        <button class="btn ghost" data-open-quality>Quality: <span data-quality-name>Auto</span></button>
+        <button class="btn link" data-home>Cancel</button>
+      </div>
+    </section>
+
+    <!-- WAITING (room) -->
+    <section id="lobby" class="screen">
+      <div class="center-stack">
+        <div class="avatar waiting"><div class="pulse"></div><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 16 0" /><path d="M7 12a5 5 0 0 1 10 0" /><circle cx="12" cy="12" r="2" /></svg></div>
+        <h2 id="lobbyTitle">Waiting for the other person…</h2>
+        <p class="muted small" id="lobbyStatus">Connecting…</p>
+        <div class="card share">
+          <span class="label">Send this link</span>
+          <code id="shareLink" class="mono"></code>
+          <div class="row">
+            <button id="copyBtn" class="btn">Copy link</button>
+            <button id="shareBtn" class="btn">Share…</button>
+          </div>
+        </div>
+        <button class="btn danger" data-hangup>Cancel</button>
+      </div>
+    </section>
+
+    <!-- PRIVATE / MANUAL -->
+    <section id="manual" class="screen">
+      <header class="topbar">
+        <button class="icon-btn" data-home aria-label="Back"><svg viewBox="0 0 24 24"><path d="m15 6-6 6 6 6" /></svg></button>
+        <h2>Private mode</h2>
+      </header>
+      <p class="muted small">No relay is used at all: you exchange two codes with the other person yourself (any chat app works). Codes contain only connection info, never audio.</p>
+
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="mCreate" role="tab">I'm calling</button>
+        <button class="tab" data-tab="mRespond" role="tab">I got a code</button>
+      </div>
+
+      <div id="mCreate" class="tabpane active">
+        <ol class="steps">
+          <li>
+            <button id="mMakeOffer" class="btn primary">Create invite</button>
+            <div id="mOfferBox" class="hidden">
+              <textarea id="mOffer" readonly rows="3" class="mono"></textarea>
+              <div class="row">
+                <button id="mCopyOffer" class="btn">Copy invite link</button>
+                <button id="mShareOffer" class="btn">Share…</button>
+              </div>
+            </div>
+          </li>
+          <li>
+            <label class="label" for="mAnswerIn">Paste their reply code</label>
+            <textarea id="mAnswerIn" rows="3" class="mono" placeholder="A1…" spellcheck="false"></textarea>
+            <button id="mConnect" class="btn primary">Connect</button>
+          </li>
+        </ol>
+      </div>
+
+      <div id="mRespond" class="tabpane">
+        <ol class="steps">
+          <li>
+            <label class="label" for="mOfferIn">Paste their invite (code or link)</label>
+            <textarea id="mOfferIn" rows="3" class="mono" placeholder="D1…" spellcheck="false"></textarea>
+            <button id="mMakeAnswer" class="btn primary">Create reply</button>
+          </li>
+          <li id="mAnswerBox" class="hidden">
+            <span class="label">Send this reply back</span>
+            <textarea id="mAnswer" readonly rows="3" class="mono"></textarea>
+            <div class="row">
+              <button id="mCopyAnswer" class="btn">Copy reply</button>
+              <button id="mShareAnswer" class="btn">Share…</button>
+            </div>
+            <p class="muted small">The call starts automatically once they paste it.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- IN CALL -->
+    <section id="call" class="screen">
+      <div class="call-top">
+        <span class="chip" id="netChip"><span class="bars" id="bars"><i></i><i></i><i></i></span><span id="routeLabel">P2P</span></span>
+        <button class="chip" data-open-quality><span data-quality-name>Auto</span></button>
+      </div>
+
+      <div class="center-stack grow">
+        <div class="avatar live" id="remoteAvatar">
+          <div class="ring" id="remoteRing"></div>
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>
+          <span class="peer-muted hidden" id="peerMuted" title="They muted"><svg viewBox="0 0 24 24"><path d="M9 9v3a3 3 0 0 0 5 2.2M15 10V5a3 3 0 0 0-5.7-1.3" /><path d="M5 11a7 7 0 0 0 11.5 5.4M19 11a7 7 0 0 1-.6 2.8M12 18v3M3 3l18 18" /></svg></span>
+        </div>
+        <h2 id="callStatus">Connecting…</h2>
+        <p class="timer" id="timer">00:00</p>
+        <p class="muted small security hidden" id="securityRow">
+          <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+          Security code <strong class="mono" id="securityCode"></strong>
+        </p>
+      </div>
+
+      <div class="card stats hidden" id="statsPanel">
+        <div><span class="label">Codec</span><strong id="sCodec">–</strong></div>
+        <div><span class="label">Latency</span><strong id="sRtt">–</strong></div>
+        <div><span class="label">Loss</span><strong id="sLoss">–</strong></div>
+        <div><span class="label">Jitter</span><strong id="sJitter">–</strong></div>
+        <div><span class="label">Up / down</span><strong id="sRate">–</strong></div>
+        <div><span class="label">Data used</span><strong id="sData">–</strong></div>
+      </div>
+
+      <div class="local-meter"><span class="label">You</span><div class="meter"><i id="localMeter"></i></div></div>
+
+      <nav class="controls">
+        <button class="ctl" id="muteBtn" aria-pressed="false">
+          <svg class="on" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
+          <svg class="off" viewBox="0 0 24 24"><path d="M9 9v3a3 3 0 0 0 5 2.2M15 10V5a3 3 0 0 0-5.7-1.3" /><path d="M5 11a7 7 0 0 0 11.5 5.4M19 11a7 7 0 0 1-.6 2.8M12 18v3M3 3l18 18" /></svg>
+          <span>Mute</span>
+        </button>
+        <button class="ctl" id="speakerBtn">
+          <svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z" /><path d="M16 9a3 3 0 0 1 0 6M18.5 6.5a7 7 0 0 1 0 11" /></svg>
+          <span id="speakerLabel">Output</span>
+        </button>
+        <button class="ctl" id="statsBtn">
+          <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg>
+          <span>Stats</span>
+        </button>
+        <button class="ctl end" data-hangup>
+          <svg viewBox="0 0 24 24"><path d="M3 14.5c5-5 13-5 18 0l-2.5 2.5-3.5-1.5v-2.5a10 10 0 0 0-6 0v2.5L5.5 17z" /></svg>
+          <span>End</span>
+        </button>
+      </nav>
+    </section>
+
+    <!-- ENDED -->
+    <section id="ended" class="screen">
+      <div class="center-stack">
+        <div class="avatar idle"><svg viewBox="0 0 24 24"><path d="M3 14.5c5-5 13-5 18 0l-2.5 2.5-3.5-1.5v-2.5a10 10 0 0 0-6 0v2.5L5.5 17z" /></svg></div>
+        <h2 id="endTitle">Call ended</h2>
+        <p class="muted" id="endDetail"></p>
+        <button id="againBtn" class="btn primary big">Call again</button>
+        <button class="btn ghost" data-home>Home</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Quality bottom sheet -->
+  <div class="sheet-backdrop hidden" id="qualitySheet">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="qTitle">
+      <div class="grabber"></div>
+      <h3 id="qTitle">Call quality</h3>
+      <p class="muted small">Both sides use the lower of your two choices, so a slow connection on either end stays smooth.</p>
+      <div id="qualityList" class="qlist" role="radiogroup"></div>
+    </div>
+  </div>
+
+  <!-- Output device sheet -->
+  <div class="sheet-backdrop hidden" id="outputSheet">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="oTitle">
+      <div class="grabber"></div>
+      <h3 id="oTitle">Audio output</h3>
+      <div id="outputList" class="qlist"></div>
+    </div>
+  </div>
+
+  <div class="toast hidden" id="toast" role="status"></div>
+  <audio id="remoteAudio" autoplay playsinline></audio>
+</body>
+</html>
