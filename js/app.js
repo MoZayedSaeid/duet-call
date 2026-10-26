@@ -9,27 +9,31 @@ const $$ = (sel) => document.querySelectorAll(sel);
 
 const SETTINGS_KEY = 'duet:settings';
 const settings = Object.assign(
-  { quality: AUTO, ns: true, ec: true, agc: true, turnUrl: '', turnUser: '', turnPass: '' },
+  {
+    quality: AUTO, ns: true, ec: true, agc: true, turnUrl: '', turnUser: '', turnPass: '',
+    theme: 'auto', largeText: false, tech: false, name: '',
+  },
   JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'),
 );
 const saveSettings = () => localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 
-function bindSetting(id, key, prop = 'value') {
+function bindSetting(id, key, prop = 'value', onChange) {
   const el = $(id);
   el[prop] = settings[key];
-  el.addEventListener('change', () => {
+  el.addEventListener(prop === 'checked' ? 'change' : 'input', () => {
     settings[key] = el[prop];
     saveSettings();
-    if (call && prop === 'checked') {
-      const map = { ns: 'noiseSuppression', ec: 'echoCancellation', agc: 'autoGainControl' };
-      if (map[key]) call.setAudioOption(map[key], el.checked);
-    }
+    onChange?.(el[prop]);
   });
 }
-bindSetting('optNs', 'ns', 'checked');
-bindSetting('optEc', 'ec', 'checked');
-bindSetting('optAgc', 'agc', 'checked');
-bindSetting('turnUrl', 'turnUrl');
+const liveAudio = (opt) => (on) => { if (call) call.setAudioOption(opt, on); };
+bindSetting('optNs', 'ns', 'checked', liveAudio('noiseSuppression'));
+bindSetting('optEc', 'ec', 'checked', liveAudio('echoCancellation'));
+bindSetting('optAgc', 'agc', 'checked', liveAudio('autoGainControl'));
+bindSetting('optLarge', 'largeText', 'checked', applyAppearance);
+bindSetting('optTech', 'tech', 'checked', applyTech);
+bindSetting('myName', 'name', 'value', renderGreeting);
+bindSetting('turnUrl', 'turnUrl', 'value', renderRelayState);
 bindSetting('turnUser', 'turnUser');
 bindSetting('turnPass', 'turnPass');
 
@@ -41,10 +45,55 @@ function iceServers() {
   return list;
 }
 
+// ---------- appearance ----------
+
+const darkQuery = matchMedia('(prefers-color-scheme: dark)');
+
+function applyAppearance() {
+  const root = document.documentElement;
+  if (settings.theme === 'auto') delete root.dataset.theme;
+  else root.dataset.theme = settings.theme;
+  if (settings.largeText) root.dataset.text = 'large';
+  else delete root.dataset.text;
+  const dark = settings.theme === 'dark' || (settings.theme === 'auto' && darkQuery.matches);
+  $('themeColor').content = dark ? '#000000' : '#f2f2f7';
+  $$('[data-theme-pick]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.themePick === settings.theme)));
+}
+darkQuery.addEventListener('change', applyAppearance);
+$$('[data-theme-pick]').forEach((b) => b.addEventListener('click', () => {
+  settings.theme = b.dataset.themePick;
+  saveSettings();
+  applyAppearance();
+}));
+
+function applyTech() {
+  $('statsPanel').classList.toggle('hidden', !settings.tech);
+  $('endDiag').classList.toggle('hidden', !settings.tech || !$('endDiag').textContent);
+  if (call?.stats) renderStats(call.stats);
+}
+
+function renderGreeting() {
+  const first = settings.name.trim().split(/\s+/)[0];
+  $('greeting').textContent = first ? `Hi, ${first}` : 'Duet';
+}
+
+function renderRelayState() {
+  $('relayState').textContent = settings.turnUrl.trim() ? 'On' : 'Not set';
+}
+
+$('relayToggle').onclick = () => {
+  const open = $('relayFields').classList.toggle('hidden') === false;
+  $('relayToggle').setAttribute('aria-expanded', String(open));
+};
+
+$('settingsBtn').onclick = () => show('settings');
+$$('[data-close-settings]').forEach((b) => b.addEventListener('click', () => show('home')));
+
 // ---------- ui helpers ----------
 
 function show(id) {
   $$('.screen').forEach((s) => s.classList.toggle('active', s.id === id));
+  document.body.classList.toggle('in-call', id === 'call');
   window.scrollTo(0, 0);
 }
 
@@ -71,49 +120,68 @@ async function copy(text, label = 'Copied') {
   toast(label);
 }
 
+const canShare = !!navigator.share;
 async function share(text, url) {
-  if (navigator.share) {
+  if (canShare) {
     try { await navigator.share({ title: 'Duet call', text, url }); return; } catch (e) { if (e.name === 'AbortError') return; }
   }
-  copy(url || text, 'Copied — paste it in any chat');
+  copy(url || text, 'Copied. Paste it in any chat.');
+}
+// Without a share menu, "Copy" becomes the main button.
+if (!canShare) {
+  for (const [s, c] of [['shareBtn', 'copyBtn'], ['mShareOffer', 'mCopyOffer'], ['mShareAnswer', 'mCopyAnswer']]) {
+    $(s).classList.add('hidden');
+    $(c).classList.add('primary');
+  }
 }
 
 const baseUrl = () => location.origin + location.pathname;
 
-// ---------- quality sheet ----------
+function initials(name) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return parts.slice(0, 2).map((p) => [...p][0].toUpperCase()).join('');
+}
+
+// ---------- sound quality sheet ----------
 
 function presetById(id) { return PRESETS[levelOf(id)]; }
 
 function renderQualityLabels() {
-  let name, hint;
+  let name, short;
   if (call && call.effLevel != null) {
     const p = PRESETS[call.effLevel];
-    name = (settings.quality === AUTO ? 'Auto · ' : '') + p.name;
+    name = (settings.quality === AUTO ? 'Automatic · ' : '') + p.name;
+    short = p.name;
   } else if (settings.quality === AUTO) {
-    name = 'Auto';
-    hint = 'Adjusts to your connection';
+    name = 'Automatic';
+    short = 'Quality';
   } else {
-    const p = presetById(settings.quality);
-    name = p.name;
-    hint = `${p.hint} · ≈${mbPerHour(p)} MB/hour`;
+    name = short = presetById(settings.quality).name;
   }
   $$('[data-quality-name]').forEach((el) => { el.textContent = name; });
-  $$('[data-quality-hint]').forEach((el) => { el.textContent = hint || ''; });
+  $$('[data-quality-short]').forEach((el) => { el.textContent = short; });
 }
 
 function renderQualityList() {
   const list = $('qualityList');
   list.innerHTML = '';
-  const opts = [{ id: AUTO, name: 'Auto (recommended)', hint: 'Picks the best quality your network can hold', meta: 'adaptive' },
-    ...[...PRESETS].reverse().map((p) => ({ id: p.id, name: p.name, hint: p.hint, meta: `${p.kbps} kbps<br>≈${mbPerHour(p)} MB/h` }))];
+  const opts = [
+    { id: AUTO, name: 'Automatic', hint: 'Best sound your internet can handle', meta: settings.tech ? 'adaptive' : '' },
+    ...[...PRESETS].reverse().map((p) => ({
+      id: p.id, name: p.name, hint: p.hint,
+      meta: `≈${mbPerHour(p)} MB/hour` + (settings.tech ? ` · ${p.kbps} kbps` : ''),
+    })),
+  ];
   for (const o of opts) {
     const b = document.createElement('button');
-    b.className = 'qopt';
+    b.className = 'cell';
     b.setAttribute('role', 'radio');
     b.setAttribute('aria-checked', String(settings.quality === o.id));
-    b.innerHTML = `<strong></strong><span class="meta">${o.meta}</span><span class="hint"></span>`;
-    b.querySelector('strong').textContent = o.name;
-    b.querySelector('.hint').textContent = o.hint;
+    b.innerHTML = '<span class="grow"><span class="title"></span><span class="sub"></span></span><span class="meta"></span>'
+      + '<svg class="check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7" /></svg>';
+    b.querySelector('.title').textContent = o.name;
+    b.querySelector('.sub').textContent = o.hint;
+    b.querySelector('.meta').textContent = o.meta;
     b.onclick = () => {
       settings.quality = o.id;
       saveSettings();
@@ -123,19 +191,19 @@ function renderQualityList() {
     };
     list.appendChild(b);
   }
-  if (call && call.effLevel != null && call.peerLevel < call.myLevel) {
-    const note = document.createElement('p');
-    note.className = 'muted small';
-    note.textContent = `The other person's connection is limiting the call to ${PRESETS[call.effLevel].name}.`;
-    list.appendChild(note);
-  }
+  const foot = $('qualityFoot');
+  foot.textContent = call && call.effLevel != null && call.peerLevel < call.myLevel
+    ? `The other person’s internet is slower, so you’re both using ${PRESETS[call.effLevel].name}.`
+    : 'Lower quality uses less data and stays smooth on slow internet. If the other person picks lower, you’ll both use theirs.';
 }
 
 function openSheet(id) { $(id).classList.remove('hidden'); }
 function closeSheets() { $$('.sheet-backdrop').forEach((s) => s.classList.add('hidden')); }
 $$('.sheet-backdrop').forEach((s) => s.addEventListener('click', (e) => { if (e.target === s) closeSheets(); }));
+$$('[data-close-sheet]').forEach((b) => b.addEventListener('click', closeSheets));
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheets(); });
 $$('[data-open-quality]').forEach((b) => b.addEventListener('click', () => { renderQualityList(); openSheet('qualitySheet'); }));
+$('securityRow').onclick = () => openSheet('privacySheet');
 
 // ---------- call wiring ----------
 
@@ -154,13 +222,14 @@ function newCall() {
     quality: settings.quality,
     audio: { noiseSuppression: settings.ns, echoCancellation: settings.ec, autoGainControl: settings.agc },
     iceServers: iceServers(),
+    name: settings.name.trim(),
   });
   const c = call;
   c.addEventListener('state', (e) => { if (c === call) onState(e.detail); });
   c.addEventListener('remote', (e) => {
     const a = $('remoteAudio');
     a.srcObject = e.detail;
-    a.play().catch(() => toast('Tap anywhere to enable sound'));
+    a.play().catch(() => toast('Tap anywhere to turn on sound'));
   });
   c.addEventListener('security', (e) => {
     $('securityCode').textContent = e.detail;
@@ -169,31 +238,53 @@ function newCall() {
   c.addEventListener('quality', () => renderQualityLabels());
   c.addEventListener('stats', (e) => renderStats(e.detail));
   c.addEventListener('peermute', (e) => $('peerMuted').classList.toggle('hidden', !e.detail));
+  c.addEventListener('peername', (e) => setPeerName(e.detail));
   c.addEventListener('relays', (e) => {
-    if (c.state === 'waiting') $('lobbyStatus').textContent = e.detail ? `Encrypted relay ready (${e.detail} route${e.detail > 1 ? 's' : ''})` : 'Reconnecting to relay…';
+    if (c.state === 'waiting') setLobbyStatus(!!e.detail);
   });
   resetCallUi();
   return c;
 }
 
+function setLobbyStatus(ready) {
+  const host = !$('shareCard').classList.contains('hidden');
+  $('lobbyStatus').textContent = !ready ? 'Reconnecting…' : host ? 'Your link is ready to send' : 'Waiting for the other person…';
+  $('lobbyDot').classList.toggle('ok', ready);
+}
+
+function setPeerName(name) {
+  const ini = name ? initials(name) : '';
+  $('peerName').textContent = name || 'Voice call';
+  $('peerInitials').textContent = ini;
+  $('peerInitials').classList.toggle('hidden', !ini);
+  $('peerIcon').classList.toggle('hidden', !!ini);
+}
+
 function resetCallUi() {
   $('securityRow').classList.add('hidden');
   $('peerMuted').classList.add('hidden');
-  $('timer').textContent = '00:00';
+  $('callStatus').textContent = 'Connecting…';
+  $('routeLabel').textContent = 'Connecting';
   $('muteBtn').setAttribute('aria-pressed', 'false');
-  $('muteBtn').querySelector('span').textContent = 'Mute';
+  $('muteLabel').textContent = 'Mute';
   $('bars').dataset.n = '3';
+  $('call').dataset.state = '';
+  setPeerName('');
+  ['sRoute', 'sRtt', 'sLoss', 'sJitter', 'sRate', 'sData'].forEach((id) => { $(id).textContent = '–'; });
+  applyTech();
   renderQualityLabels();
 }
 
 function onState({ state, info }) {
+  $('call').dataset.state = state;
   switch (state) {
     case 'connecting-relay':
-      $('lobbyStatus').textContent = 'Reaching encrypted relay…';
+      $('lobbyStatus').textContent = 'Getting ready…';
+      $('lobbyDot').classList.remove('ok');
       break;
     case 'waiting':
-      if (!call.manual) $('lobbyStatus').textContent = 'Encrypted relay ready';
-      if (call.room && !$('lobby').classList.contains('active')) show('lobby'); // peer left before connecting
+      if (!call.manual) setLobbyStatus(true);
+      if (call.room && !$('lobby').classList.contains('active')) show('lobby'); // they left before connecting
       break;
     case 'connecting':
       if (!call.manual) { show('call'); $('callStatus').textContent = 'Connecting…'; }
@@ -201,60 +292,67 @@ function onState({ state, info }) {
       break;
     case 'connected':
       show('call');
-      $('callStatus').textContent = 'Connected';
       startTimer();
       startMeters();
       keepAwake();
       break;
     case 'reconnecting':
+      clearInterval(timerInt);
       $('callStatus').textContent = 'Reconnecting…';
+      $('routeLabel').textContent = 'Weak connection';
       $('bars').dataset.n = '1';
       break;
     case 'retrying':
-      $('callStatus').textContent = 'Trying another route…';
+      $('callStatus').textContent = 'Still trying…';
       break;
     case 'failed':
-      endUi('Couldn’t connect', info?.message || 'The connection could not be established.', info?.detail);
+      endUi('Couldn’t connect', info?.message || 'Something went wrong. Please try again.', info?.detail, true);
       call.end('failed');
       break;
     case 'ended': {
       if (info.reason === 'failed') return;
-      const reasons = { remote: 'They hung up', lost: 'Connection lost', local: 'Call ended' };
+      const reasons = { remote: 'They hung up', lost: 'Call dropped', local: 'Call ended' };
       const parts = [];
+      if (info.reason === 'lost') parts.push('The internet connection was lost.');
       if (info.duration) parts.push(fmtDuration(info.duration));
-      if (info.bytes) parts.push(fmtBytes(info.bytes) + ' used');
-      endUi(reasons[info.reason] || 'Call ended', parts.join(' · '));
+      if (info.bytes && settings.tech) parts.push(fmtBytes(info.bytes) + ' used');
+      endUi(reasons[info.reason] || 'Call ended', parts.join(' · '), '', info.reason === 'lost');
       break;
     }
   }
 }
 
-function endUi(title, detail, diag) {
+function endUi(title, detail, diag, bad = false) {
   $('endDiag').textContent = diag || '';
-  $('endDiag').classList.toggle('hidden', !diag);
   clearInterval(timerInt);
   cancelAnimationFrame(meterRaf);
   releaseWake();
+  closeSheets();
   $('remoteAudio').srcObject = null;
   $('endTitle').textContent = title;
   $('endDetail').textContent = detail || '';
-  $('againBtn').textContent = wasManual ? 'New private call' : 'Call again';
+  $('endAvatar').classList.toggle('red', bad);
+  $('againBtn').textContent = bad ? 'Try again' : wasManual ? 'New private call' : 'Call again';
+  applyTech();
   show('ended');
 }
 
 function startTimer() {
   clearInterval(timerInt);
-  const tick = () => { if (call?.connectedAt) $('timer').textContent = fmtDuration(Date.now() - call.connectedAt); };
+  const tick = () => { if (call?.connectedAt) $('callStatus').textContent = fmtDuration(Date.now() - call.connectedAt); };
   tick();
   timerInt = setInterval(tick, 1000);
 }
 
 function renderStats(s) {
+  if (!s || s.bars == null) return;
   $('bars').dataset.n = String(s.bars);
-  $('routeLabel').textContent = s.route === 'relay' ? 'Relayed' : 'P2P direct';
-  $('sCodec').textContent = s.codec || '–';
+  const words = { 1: 'Weak connection', 2: 'Fair connection', 3: 'Good connection' };
+  const direct = s.route === 'relay' ? 'Relayed' : 'Direct';
+  $('routeLabel').textContent = words[s.bars] + (settings.tech ? ` · ${direct}` : '');
+  $('sRoute').textContent = direct;
   $('sRtt').textContent = s.rtt != null ? Math.round(s.rtt * 1000) + ' ms' : '–';
-  $('sLoss').textContent = (Math.max(s.lossIn, s.lossOut || 0) * 100).toFixed(1) + '%';
+  $('sLoss').textContent = (Math.max(s.lossIn || 0, s.lossOut || 0) * 100).toFixed(1) + '%';
   $('sJitter').textContent = s.jitter != null ? Math.round(s.jitter * 1000) + ' ms' : '–';
   $('sRate').textContent = `${Math.round(s.kbpsOut)} / ${Math.round(s.kbpsIn)} kbps`;
   $('sData').textContent = fmtBytes(s.bytes);
@@ -317,9 +415,10 @@ async function startRoom(code, isHost) {
   history.replaceState(null, '', '#r=' + code);
   const link = baseUrl() + '#r=' + code;
   $('shareLink').textContent = link;
-  $('lobby').querySelector('.share').classList.toggle('hidden', !isHost);
-  $('lobbyTitle').textContent = isHost ? 'Waiting for the other person…' : 'Joining call…';
-  $('lobbyStatus').textContent = 'Starting microphone…';
+  $('shareCard').classList.toggle('hidden', !isHost);
+  $('lobbyTitle').textContent = isHost ? 'Waiting for them to join' : 'Joining the call…';
+  $('lobbyStatus').textContent = 'Turning on your microphone…';
+  $('lobbyDot').classList.remove('ok');
   show('lobby');
   const c = newCall();
   try {
@@ -332,9 +431,9 @@ async function startRoom(code, isHost) {
 }
 
 function micError(e) {
-  if (e.name === 'NotAllowedError') return 'Microphone access was blocked. Allow it in your browser settings.';
-  if (e.name === 'NotFoundError') return 'No microphone found.';
-  if (e.name === 'NotReadableError') return 'Your microphone is being used by another app.';
+  if (e.name === 'NotAllowedError') return 'Duet needs your microphone. Allow it in your browser settings, then try again.';
+  if (e.name === 'NotFoundError') return 'No microphone found. Plug one in and try again.';
+  if (e.name === 'NotReadableError') return 'Another app is using your microphone. Close it and try again.';
   return '';
 }
 
@@ -351,10 +450,10 @@ function parseInvite(text) {
 
 $('startBtn').onclick = () => startRoom(newRoomCode(), true);
 $('copyBtn').onclick = () => copy($('shareLink').textContent, 'Link copied');
-$('shareBtn').onclick = () => share('Join my private Duet call', $('shareLink').textContent);
+$('shareBtn').onclick = () => share('Join my Duet call', $('shareLink').textContent);
 $('joinBtn').onclick = () => {
   const inv = parseInvite($('joinInput').value);
-  if (!inv) return toast('That doesn’t look like a Duet link or code');
+  if (!inv) return toast('That link doesn’t look right. Try copying it again.');
   $('joinInput').value = '';
   if (inv.manual) return openManual(inv.manual);
   startRoom(inv.room, false);
@@ -391,29 +490,25 @@ $('muteBtn').onclick = () => {
   const m = !call.muted;
   call.setMuted(m);
   $('muteBtn').setAttribute('aria-pressed', String(m));
-  $('muteBtn').querySelector('span').textContent = m ? 'Unmute' : 'Mute';
-};
-
-$('statsBtn').onclick = () => {
-  const hidden = $('statsPanel').classList.toggle('hidden');
-  $('statsBtn').classList.toggle('active', !hidden);
+  $('muteLabel').textContent = m ? 'Unmute' : 'Mute';
 };
 
 const canPickOutput = 'setSinkId' in HTMLMediaElement.prototype;
-if (!canPickOutput) $('speakerBtn').classList.add('hidden');
+if (!canPickOutput) $('speakerBtn').disabled = true;
 $('speakerBtn').onclick = async () => {
   const devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audiooutput');
   const list = $('outputList');
   list.innerHTML = '';
   const current = $('remoteAudio').sinkId || 'default';
-  for (const d of devices.length ? devices : [{ deviceId: 'default', label: 'Default' }]) {
+  for (const d of devices.length ? devices : [{ deviceId: 'default', label: 'This device' }]) {
     const b = document.createElement('button');
-    b.className = 'qopt';
+    b.className = 'cell';
+    b.setAttribute('role', 'radio');
     b.setAttribute('aria-checked', String(d.deviceId === current));
-    b.innerHTML = '<strong></strong>';
-    b.querySelector('strong').textContent = d.label || 'Speaker';
+    b.innerHTML = '<span class="grow"><span class="title"></span></span><svg class="check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7" /></svg>';
+    b.querySelector('.title').textContent = d.deviceId === 'default' ? 'This device' : d.label || 'Speaker';
     b.onclick = async () => {
-      try { await $('remoteAudio').setSinkId(d.deviceId); } catch { toast('Could not switch output'); }
+      try { await $('remoteAudio').setSinkId(d.deviceId); } catch { toast('Couldn’t switch the speaker'); }
       closeSheets();
     };
     list.appendChild(b);
@@ -421,7 +516,7 @@ $('speakerBtn').onclick = async () => {
   openSheet('outputSheet');
 };
 
-// Some mobile browsers need a gesture before audio can play.
+// Some mobile browsers need a tap before audio can play.
 document.addEventListener('click', () => {
   const a = $('remoteAudio');
   if (a.srcObject && a.paused) a.play().catch(() => {});
@@ -430,7 +525,7 @@ document.addEventListener('click', () => {
 
 window.addEventListener('pagehide', () => { if (call && call.state !== 'ended') call.end('local'); });
 
-// ---------- private (manual) mode ----------
+// ---------- extra-private (manual codes) mode ----------
 
 $('privateBtn').onclick = () => openManual();
 
@@ -440,6 +535,7 @@ function openManual(offerCode) {
   call = null;
   $('mOfferBox').classList.add('hidden');
   $('mAnswerBox').classList.add('hidden');
+  $('mMakeOffer').classList.remove('hidden');
   $('mMakeOffer').disabled = false;
   $('mMakeAnswer').disabled = false;
   $('mAnswerIn').value = '';
@@ -450,7 +546,10 @@ function openManual(offerCode) {
 }
 
 function selectTab(id) {
-  $$('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === id));
+  $$('.tab').forEach((t) => {
+    t.classList.toggle('active', t.dataset.tab === id);
+    t.setAttribute('aria-selected', String(t.dataset.tab === id));
+  });
   $$('.tabpane').forEach((p) => p.classList.toggle('active', p.id === id));
 }
 $$('.tab').forEach((t) => t.addEventListener('click', () => selectTab(t.dataset.tab)));
@@ -465,22 +564,22 @@ $('mMakeOffer').onclick = async () => {
     $('mOfferBox').classList.remove('hidden');
     $('mMakeOffer').classList.add('hidden');
   } catch (e) {
-    toast(micError(e) || 'Could not create invite', 4000);
+    toast(micError(e) || 'Couldn’t create the invite. Please try again.', 4000);
     $('mMakeOffer').disabled = false;
   }
   $('mMakeOffer').textContent = 'Create invite';
 };
-$('mCopyOffer').onclick = () => copy($('mOffer').value, 'Invite link copied');
-$('mShareOffer').onclick = () => share('Join my private Duet call (open the link, then send me the reply code)', $('mOffer').value);
+$('mCopyOffer').onclick = () => copy($('mOffer').value, 'Invite copied');
+$('mShareOffer').onclick = () => share('Join my private Duet call. Open the link, then send me the reply.', $('mOffer').value);
 
 $('mConnect').onclick = async () => {
   if (!call || !call.manual) return toast('Create an invite first');
-  try { await call.acceptManualAnswer($('mAnswerIn').value); } catch { toast('That reply code is not valid'); }
+  try { await call.acceptManualAnswer($('mAnswerIn').value); } catch { toast('That reply doesn’t look right. Try copying it again.'); }
 };
 
 $('mMakeAnswer').onclick = async () => {
   const inv = parseInvite($('mOfferIn').value);
-  if (!inv?.manual) return toast('Paste the invite link or code you received');
+  if (!inv?.manual) return toast('Paste the invite you received first');
   $('mMakeAnswer').disabled = true;
   try {
     const c = newCall();
@@ -488,7 +587,7 @@ $('mMakeAnswer').onclick = async () => {
     $('mAnswer').value = ans;
     $('mAnswerBox').classList.remove('hidden');
   } catch (e) {
-    toast(micError(e) || 'That invite is not valid (or expired)', 4000);
+    toast(micError(e) || 'That invite doesn’t work. Ask them for a new one.', 4000);
     $('mMakeAnswer').disabled = false;
   }
 };
@@ -504,5 +603,8 @@ function route() {
   show('home');
 }
 window.addEventListener('hashchange', () => { if (!call || call.state === 'ended') route(); });
+applyAppearance();
+renderGreeting();
+renderRelayState();
 renderQualityLabels();
 route();

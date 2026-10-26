@@ -44,7 +44,7 @@ export class Room {
     const attempts = this.brokers.map((url) => this._connect(url));
     // Resolve as soon as ONE broker is up; others join in the background.
     await Promise.any(attempts).catch(() => {
-      throw new Error('Could not reach any signaling relay. Check your connection or try Private mode.');
+      throw new Error('Can’t connect right now. Check your internet and try again.');
     });
   }
 

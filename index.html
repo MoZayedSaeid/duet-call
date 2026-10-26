@@ -5,11 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob: mediastream:; connect-src 'self' wss://broker.emqx.io:8084 wss://broker.hivemq.com:8884 wss://broker-cn.emqx.io:8084; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="referrer" content="no-referrer">
-  <meta name="theme-color" content="#0b0d12">
-  <meta name="description" content="Private, peer-to-peer HD voice calls in your browser. No accounts, no servers, works on slow connections.">
-  <title>Duet · private P2P voice calls</title>
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f2f2f7" id="themeColor">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Duet">
+  <meta name="description" content="Free, private voice calls in your browser. No sign-up, no app to install, works on slow internet.">
+  <title>Duet · Private voice calls</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
   <link rel="manifest" href="manifest.webmanifest">
+  <script src="js/theme.js"></script>
   <link rel="stylesheet" href="css/style.css">
   <script type="module" src="js/app.js"></script>
 </head>
@@ -17,120 +23,224 @@
   <main id="app">
 
     <!-- HOME -->
-    <section id="home" class="screen active">
-      <header class="brand">
-        <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 16 0" /><path d="M7 12a5 5 0 0 1 10 0" /><circle cx="12" cy="12" r="2" /><path d="M12 14v6" /></svg></div>
-        <div>
-          <h1>Duet</h1>
-          <p class="muted">Private peer-to-peer voice calls</p>
-        </div>
+    <section id="home" class="screen active" aria-label="Home">
+      <div class="navbar">
+        <span class="nav-spacer"></span>
+        <button class="nav-btn round" id="settingsBtn" aria-label="Settings">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+        </button>
+      </div>
+
+      <header class="large-title">
+        <h1 id="greeting">Duet</h1>
+        <p class="muted">Free, private voice calls. No sign-up needed.</p>
       </header>
 
-      <button id="startBtn" class="btn primary big">
-        <svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" /></svg>
-        Start a call
-      </button>
+      <div class="hero">
+        <div class="hero-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" /></svg></div>
+        <h2>Call someone</h2>
+        <p class="muted">You’ll get a link to send them. The call starts as soon as they open it.</p>
+        <button id="startBtn" class="btn go big">New call</button>
+      </div>
 
-      <div class="card">
-        <label for="joinInput" class="label">Have an invite?</label>
-        <div class="row">
-          <input id="joinInput" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste link or code">
-          <button id="joinBtn" class="btn">Join</button>
+      <div class="group">
+        <label class="group-title" for="joinInput">Got a link?</label>
+        <div class="join-row">
+          <input id="joinInput" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste it here">
+          <button id="joinBtn" class="btn primary">Join</button>
         </div>
       </div>
 
-      <button class="card quality-pick" data-open-quality>
-        <span>
-          <span class="label">Call quality</span>
-          <strong data-quality-name>Auto</strong>
-          <span class="muted small" data-quality-hint></span>
-        </span>
-        <svg class="chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" /></svg>
-      </button>
-
-      <details class="card settings">
-        <summary>Settings</summary>
-        <label class="toggle"><input type="checkbox" id="optNs" checked><span>Noise suppression</span></label>
-        <label class="toggle"><input type="checkbox" id="optEc" checked><span>Echo cancellation</span></label>
-        <label class="toggle"><input type="checkbox" id="optAgc" checked><span>Auto volume (AGC)</span></label>
-        <p class="label spaced">TURN relay <span class="muted">(optional, only for very strict networks)</span></p>
-        <input id="turnUrl" type="text" placeholder="turns:turn.example.com:443" autocomplete="off" spellcheck="false">
-        <div class="row">
-          <input id="turnUser" type="text" placeholder="Username" autocomplete="off" spellcheck="false">
-          <input id="turnPass" type="password" placeholder="Credential" autocomplete="off">
+      <div class="group">
+        <div class="list icons">
+          <button class="cell" data-open-quality>
+            <span class="ico pink"><svg viewBox="0 0 24 24"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4" /></svg></span>
+            <span class="grow"><span class="title">Sound quality</span></span>
+            <span class="value" data-quality-name>Automatic</span>
+            <svg class="chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" /></svg>
+          </button>
+          <button class="cell" id="privateBtn">
+            <span class="ico indigo"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg></span>
+            <span class="grow"><span class="title">Extra-private call</span><span class="sub">Swap two messages instead of a link</span></span>
+            <svg class="chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" /></svg>
+          </button>
         </div>
-      </details>
+      </div>
 
-      <button id="privateBtn" class="btn ghost">
-        <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
-        Private mode (no relay at all)
-      </button>
+      <p class="foot">
+        <svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 3 8.3 7 10 4-1.7 7-5.5 7-10V6z" /><path d="m9 12 2 2 4-4" /></svg>
+        <span>Your voice goes straight to the other person, locked so no one else can listen. Nothing is saved.</span>
+      </p>
+    </section>
 
-      <footer class="muted small foot">
-        Audio flows directly between you, encrypted end-to-end with DTLS-SRTP.
-        Nothing is stored. No accounts.
-      </footer>
+    <!-- SETTINGS -->
+    <section id="settings" class="screen" aria-label="Settings">
+      <div class="navbar">
+        <span class="nav-spacer"></span>
+        <span class="nav-title">Settings</span>
+        <button class="nav-btn strong" data-close-settings>Done</button>
+      </div>
+
+      <div class="group">
+        <span class="group-title">You</span>
+        <div class="list icons">
+          <label class="cell">
+            <span class="ico orange"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg></span>
+            <span class="title">Your name</span>
+            <input id="myName" type="text" maxlength="40" placeholder="Optional" autocomplete="given-name" enterkeyhint="done">
+          </label>
+        </div>
+        <p class="group-foot">Shown to the person you call. It stays on this device.</p>
+      </div>
+
+      <div class="group">
+        <span class="group-title">Appearance</span>
+        <div class="list">
+          <div class="theme-tiles" role="radiogroup" aria-label="Appearance" id="themeTiles">
+            <button class="theme-tile" role="radio" data-theme-pick="light"><span class="art light"><i></i><i></i></span><span>Light</span><span class="tick"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7" /></svg></span></button>
+            <button class="theme-tile" role="radio" data-theme-pick="dark"><span class="art dark"><i></i><i></i></span><span>Dark</span><span class="tick"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7" /></svg></span></button>
+            <button class="theme-tile" role="radio" data-theme-pick="auto"><span class="art auto"><i></i><i></i></span><span>Automatic</span><span class="tick"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7" /></svg></span></button>
+          </div>
+          <label class="cell">
+            <span class="grow"><span class="title">Larger text</span></span>
+            <input type="checkbox" class="switch" id="optLarge">
+          </label>
+        </div>
+        <p class="group-foot">Automatic follows your phone or computer’s setting.</p>
+      </div>
+
+      <div class="group">
+        <span class="group-title">Sound</span>
+        <div class="list icons">
+          <button class="cell" data-open-quality>
+            <span class="ico pink"><svg viewBox="0 0 24 24"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4" /></svg></span>
+            <span class="grow"><span class="title">Sound quality</span></span>
+            <span class="value" data-quality-name>Automatic</span>
+            <svg class="chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" /></svg>
+          </button>
+          <label class="cell">
+            <span class="ico blue"><svg viewBox="0 0 24 24"><path d="M2 12h3l2-5 3 10 3-14 3 14 2-5h4" /></svg></span>
+            <span class="grow"><span class="title">Reduce background noise</span></span>
+            <input type="checkbox" class="switch" id="optNs">
+          </label>
+          <label class="cell">
+            <span class="ico green"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z" /><path d="M16 9a3 3 0 0 1 0 6" /><path d="m19 8 2 2m0-2-2 2" /></svg></span>
+            <span class="grow"><span class="title">Stop echo</span></span>
+            <input type="checkbox" class="switch" id="optEc">
+          </label>
+          <label class="cell">
+            <span class="ico orange"><svg viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" /></svg></span>
+            <span class="grow"><span class="title">Even out my volume</span></span>
+            <input type="checkbox" class="switch" id="optAgc">
+          </label>
+        </div>
+        <p class="group-foot">Turn these off if you’re playing music and want it to sound natural.</p>
+      </div>
+
+      <div class="group">
+        <span class="group-title">Advanced</span>
+        <div class="list icons">
+          <label class="cell">
+            <span class="ico gray"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg></span>
+            <span class="grow"><span class="title">Show technical details</span><span class="sub">Connection numbers during calls</span></span>
+            <input type="checkbox" class="switch" id="optTech">
+          </label>
+          <button class="cell" id="relayToggle" aria-expanded="false" aria-controls="relayFields">
+            <span class="ico gray"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="7" rx="2" /><rect x="3" y="13" width="18" height="7" rx="2" /><path d="M7 7.5h.01M7 16.5h.01" /></svg></span>
+            <span class="grow"><span class="title">My own relay server</span><span class="sub" id="relayState">Not set</span></span>
+            <svg class="chev down" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" /></svg>
+          </button>
+          <div id="relayFields" class="hidden">
+            <label class="cell field"><span class="title">Server address</span><input id="turnUrl" type="text" placeholder="turn:example.com:3478" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+            <label class="cell field"><span class="title">Username</span><input id="turnUser" type="text" placeholder="Username" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+            <label class="cell field"><span class="title">Password</span><input id="turnPass" type="password" placeholder="Password" autocomplete="off"></label>
+          </div>
+        </div>
+        <p class="group-foot">Most people never need a relay server. It only helps if calls won’t connect on a very strict network, like some offices.</p>
+      </div>
+
+      <div class="group">
+        <span class="group-title">Privacy</span>
+        <div class="list">
+          <div class="cell"><span class="grow"><span class="title">Calls go straight between you</span><span class="sub">Your voice isn’t sent to a company’s server.</span></span></div>
+          <div class="cell"><span class="grow"><span class="title">Always locked</span><span class="sub">Every call is encrypted, with no extra delay.</span></span></div>
+          <div class="cell"><span class="grow"><span class="title">Nothing is kept</span><span class="sub">No accounts, no history, no recordings.</span></span></div>
+        </div>
+      </div>
     </section>
 
     <!-- INVITED -->
-    <section id="invite" class="screen">
+    <section id="invite" class="screen" aria-label="Invitation">
       <div class="center-stack">
-        <div class="avatar idle"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg></div>
-        <h2>You're invited to a call</h2>
-        <p class="muted">Your microphone is only used once you join.</p>
-        <button id="acceptBtn" class="btn primary big">Join call</button>
-        <button class="btn ghost" data-open-quality>Quality: <span data-quality-name>Auto</span></button>
-        <button class="btn link" data-home>Cancel</button>
+        <div class="avatar green"><svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" /></svg></div>
+        <h2>Someone’s calling you</h2>
+        <p class="muted">Your microphone only turns on when you join.</p>
+        <div class="btn-col">
+          <button id="acceptBtn" class="btn go big">Join call</button>
+          <button class="btn plain" data-open-quality><span>Sound quality: <span data-quality-name>Automatic</span></span></button>
+          <button class="btn plain danger" data-home>Not now</button>
+        </div>
       </div>
     </section>
 
-    <!-- WAITING (room) -->
-    <section id="lobby" class="screen">
+    <!-- WAITING -->
+    <section id="lobby" class="screen" aria-label="Waiting">
       <div class="center-stack">
-        <div class="avatar waiting"><div class="pulse"></div><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 16 0" /><path d="M7 12a5 5 0 0 1 10 0" /><circle cx="12" cy="12" r="2" /></svg></div>
-        <h2 id="lobbyTitle">Waiting for the other person…</h2>
-        <p class="muted small" id="lobbyStatus">Connecting…</p>
-        <div class="card share">
-          <span class="label">Send this link</span>
-          <code id="shareLink" class="mono"></code>
-          <div class="row">
-            <button id="copyBtn" class="btn">Copy link</button>
-            <button id="shareBtn" class="btn">Share…</button>
+        <div class="avatar green"><div class="pulse"></div><svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" /></svg></div>
+        <h2 id="lobbyTitle">Waiting for them to join</h2>
+        <p class="muted status-line"><span class="dot" id="lobbyDot"></span><span id="lobbyStatus">Getting ready…</span></p>
+        <div class="share-card" id="shareCard">
+          <h3>Send this link to the person you’re calling</h3>
+          <code id="shareLink" class="link mono"></code>
+          <div class="btn-row">
+            <button id="shareBtn" class="btn primary">
+              <svg viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4" /><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" /></svg>
+              Share
+            </button>
+            <button id="copyBtn" class="btn">
+              <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V6a2 2 0 0 1 2-2h9" /></svg>
+              Copy
+            </button>
           </div>
         </div>
-        <button class="btn danger" data-hangup>Cancel</button>
+        <div class="btn-col">
+          <button class="btn plain danger" data-hangup>Cancel</button>
+        </div>
       </div>
     </section>
 
-    <!-- PRIVATE / MANUAL -->
-    <section id="manual" class="screen">
-      <header class="topbar">
-        <button class="icon-btn" data-home aria-label="Back"><svg viewBox="0 0 24 24"><path d="m15 6-6 6 6 6" /></svg></button>
-        <h2>Private mode</h2>
-      </header>
-      <p class="muted small">No relay is used at all: you exchange two codes with the other person yourself (any chat app works). Codes contain only connection info, never audio.</p>
+    <!-- EXTRA-PRIVATE (manual codes) -->
+    <section id="manual" class="screen" aria-label="Extra-private call">
+      <div class="navbar">
+        <button class="nav-btn" data-home><svg viewBox="0 0 24 24"><path d="m15 6-6 6 6 6" /></svg>Back</button>
+        <span class="nav-title">Extra-private call</span>
+        <span class="nav-spacer"></span>
+      </div>
+      <p class="muted small">Nothing goes through a link service. You and the other person swap two messages yourselves, in any chat app or by email.</p>
 
-      <div class="tabs" role="tablist">
-        <button class="tab active" data-tab="mCreate" role="tab">I'm calling</button>
-        <button class="tab" data-tab="mRespond" role="tab">I got a code</button>
+      <div class="segmented" role="tablist">
+        <button class="tab active" data-tab="mCreate" role="tab">I’m calling</button>
+        <button class="tab" data-tab="mRespond" role="tab">I got an invite</button>
       </div>
 
       <div id="mCreate" class="tabpane active">
         <ol class="steps">
           <li>
+            <h3>Create an invite</h3>
             <button id="mMakeOffer" class="btn primary">Create invite</button>
             <div id="mOfferBox" class="hidden">
-              <textarea id="mOffer" readonly rows="3" class="mono"></textarea>
-              <div class="row">
-                <button id="mCopyOffer" class="btn">Copy invite link</button>
-                <button id="mShareOffer" class="btn">Share…</button>
+              <p class="muted small">Send this to the other person.</p>
+              <textarea id="mOffer" readonly rows="3" class="mono" aria-label="Your invite"></textarea>
+              <div class="btn-row">
+                <button id="mShareOffer" class="btn primary">Share</button>
+                <button id="mCopyOffer" class="btn">Copy</button>
               </div>
             </div>
           </li>
           <li>
-            <label class="label" for="mAnswerIn">Paste their reply code</label>
-            <textarea id="mAnswerIn" rows="3" class="mono" placeholder="A1…" spellcheck="false"></textarea>
-            <button id="mConnect" class="btn primary">Connect</button>
+            <h3>Paste their reply</h3>
+            <textarea id="mAnswerIn" rows="3" class="mono" placeholder="It starts with A1…" spellcheck="false" aria-label="Their reply"></textarea>
+            <button id="mConnect" class="btn go">Start call</button>
           </li>
         </ol>
       </div>
@@ -138,109 +248,129 @@
       <div id="mRespond" class="tabpane">
         <ol class="steps">
           <li>
-            <label class="label" for="mOfferIn">Paste their invite (code or link)</label>
-            <textarea id="mOfferIn" rows="3" class="mono" placeholder="D1…" spellcheck="false"></textarea>
+            <h3>Paste the invite you got</h3>
+            <textarea id="mOfferIn" rows="3" class="mono" placeholder="Paste the link or message" spellcheck="false" aria-label="Invite you received"></textarea>
             <button id="mMakeAnswer" class="btn primary">Create reply</button>
           </li>
           <li id="mAnswerBox" class="hidden">
-            <span class="label">Send this reply back</span>
-            <textarea id="mAnswer" readonly rows="3" class="mono"></textarea>
-            <div class="row">
-              <button id="mCopyAnswer" class="btn">Copy reply</button>
-              <button id="mShareAnswer" class="btn">Share…</button>
+            <h3>Send this reply back</h3>
+            <textarea id="mAnswer" readonly rows="3" class="mono" aria-label="Your reply"></textarea>
+            <div class="btn-row">
+              <button id="mShareAnswer" class="btn primary">Share</button>
+              <button id="mCopyAnswer" class="btn">Copy</button>
             </div>
-            <p class="muted small">The call starts automatically once they paste it.</p>
+            <p class="muted small">The call starts by itself once they paste it.</p>
           </li>
         </ol>
       </div>
     </section>
 
     <!-- IN CALL -->
-    <section id="call" class="screen">
+    <section id="call" class="screen" aria-label="Call">
       <div class="call-top">
-        <span class="chip" id="netChip"><span class="bars" id="bars"><i></i><i></i><i></i></span><span id="routeLabel">P2P</span></span>
-        <button class="chip" data-open-quality><span data-quality-name>Auto</span></button>
+        <span class="pill" id="netChip"><span class="bars" id="bars" data-n="3"><i></i><i></i><i></i></span><span id="routeLabel">Connecting</span></span>
       </div>
 
       <div class="center-stack grow">
         <div class="avatar live" id="remoteAvatar">
           <div class="ring" id="remoteRing"></div>
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>
-          <span class="peer-muted hidden" id="peerMuted" title="They muted"><svg viewBox="0 0 24 24"><path d="M9 9v3a3 3 0 0 0 5 2.2M15 10V5a3 3 0 0 0-5.7-1.3" /><path d="M5 11a7 7 0 0 0 11.5 5.4M19 11a7 7 0 0 1-.6 2.8M12 18v3M3 3l18 18" /></svg></span>
+          <span class="initials hidden" id="peerInitials"></span>
+          <svg viewBox="0 0 24 24" id="peerIcon"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>
+          <span class="peer-muted hidden" id="peerMuted" title="They’re muted"><svg viewBox="0 0 24 24"><path d="M9 9v3a3 3 0 0 0 5 2.2M15 10V5a3 3 0 0 0-5.7-1.3" /><path d="M5 11a7 7 0 0 0 11.5 5.4M19 11a7 7 0 0 1-.6 2.8M12 18v3M3 3l18 18" /></svg></span>
         </div>
-        <h2 id="callStatus">Connecting…</h2>
-        <p class="timer" id="timer">00:00</p>
-        <p class="muted small security hidden" id="securityRow">
+        <h2 id="peerName">Duet call</h2>
+        <p class="call-status" id="callStatus" aria-live="polite">Connecting…</p>
+        <button class="privacy hidden" id="securityRow">
           <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
-          Security code <strong class="mono" id="securityCode"></strong>
-        </p>
+          Private call
+        </button>
       </div>
 
-      <div class="card stats hidden" id="statsPanel">
-        <div><span class="label">Codec</span><strong id="sCodec">–</strong></div>
-        <div><span class="label">Latency</span><strong id="sRtt">–</strong></div>
-        <div><span class="label">Loss</span><strong id="sLoss">–</strong></div>
-        <div><span class="label">Jitter</span><strong id="sJitter">–</strong></div>
-        <div><span class="label">Up / down</span><strong id="sRate">–</strong></div>
-        <div><span class="label">Data used</span><strong id="sData">–</strong></div>
+      <div class="stats hidden" id="statsPanel">
+        <div><span>Route</span><strong id="sRoute">–</strong></div>
+        <div><span>Delay</span><strong id="sRtt">–</strong></div>
+        <div><span>Lost</span><strong id="sLoss">–</strong></div>
+        <div><span>Jitter</span><strong id="sJitter">–</strong></div>
+        <div><span>Up / down</span><strong id="sRate">–</strong></div>
+        <div><span>Data used</span><strong id="sData">–</strong></div>
       </div>
 
-      <div class="local-meter"><span class="label">You</span><div class="meter"><i id="localMeter"></i></div></div>
+      <div class="mic-level" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
+        <div class="meter"><i id="localMeter"></i></div>
+      </div>
 
-      <nav class="controls">
+      <nav class="controls" aria-label="Call controls">
         <button class="ctl" id="muteBtn" aria-pressed="false">
-          <svg class="on" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
-          <svg class="off" viewBox="0 0 24 24"><path d="M9 9v3a3 3 0 0 0 5 2.2M15 10V5a3 3 0 0 0-5.7-1.3" /><path d="M5 11a7 7 0 0 0 11.5 5.4M19 11a7 7 0 0 1-.6 2.8M12 18v3M3 3l18 18" /></svg>
-          <span>Mute</span>
+          <span class="disc">
+            <svg class="on" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
+            <svg class="off" viewBox="0 0 24 24"><path d="M9 9v3a3 3 0 0 0 5 2.2M15 10V5a3 3 0 0 0-5.7-1.3" /><path d="M5 11a7 7 0 0 0 11.5 5.4M19 11a7 7 0 0 1-.6 2.8M12 18v3M3 3l18 18" /></svg>
+          </span>
+          <span id="muteLabel">Mute</span>
         </button>
         <button class="ctl" id="speakerBtn">
-          <svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z" /><path d="M16 9a3 3 0 0 1 0 6M18.5 6.5a7 7 0 0 1 0 11" /></svg>
-          <span id="speakerLabel">Output</span>
+          <span class="disc"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z" /><path d="M16 9a3 3 0 0 1 0 6M18.5 6.5a7 7 0 0 1 0 11" /></svg></span>
+          <span>Speaker</span>
         </button>
-        <button class="ctl" id="statsBtn">
-          <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg>
-          <span>Stats</span>
-        </button>
-        <button class="ctl end" data-hangup>
-          <svg viewBox="0 0 24 24"><path d="M3 14.5c5-5 13-5 18 0l-2.5 2.5-3.5-1.5v-2.5a10 10 0 0 0-6 0v2.5L5.5 17z" /></svg>
-          <span>End</span>
+        <button class="ctl" data-open-quality>
+          <span class="disc"><svg viewBox="0 0 24 24"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4" /></svg></span>
+          <span data-quality-short>Quality</span>
         </button>
       </nav>
+
+      <div class="end-wrap">
+        <button class="end-call" data-hangup aria-label="End call">
+          <svg viewBox="0 0 24 24"><path d="M3 14.5c5-5 13-5 18 0l-2.5 2.5-3.5-1.5v-2.5a10 10 0 0 0-6 0v2.5L5.5 17z" /></svg>
+        </button>
+        <span aria-hidden="true">End</span>
+      </div>
     </section>
 
     <!-- ENDED -->
-    <section id="ended" class="screen">
+    <section id="ended" class="screen" aria-label="Call ended">
       <div class="center-stack">
-        <div class="avatar idle"><svg viewBox="0 0 24 24"><path d="M3 14.5c5-5 13-5 18 0l-2.5 2.5-3.5-1.5v-2.5a10 10 0 0 0-6 0v2.5L5.5 17z" /></svg></div>
+        <div class="avatar" id="endAvatar"><svg viewBox="0 0 24 24"><path d="M3 14.5c5-5 13-5 18 0l-2.5 2.5-3.5-1.5v-2.5a10 10 0 0 0-6 0v2.5L5.5 17z" /></svg></div>
         <h2 id="endTitle">Call ended</h2>
         <p class="muted" id="endDetail"></p>
-        <p class="muted small mono hidden" id="endDiag"></p>
-        <button id="againBtn" class="btn primary big">Call again</button>
-        <button class="btn ghost" data-home>Home</button>
+        <p class="diag mono hidden" id="endDiag"></p>
+        <div class="btn-col">
+          <button id="againBtn" class="btn go big">Call again</button>
+          <button class="btn plain" data-home>Done</button>
+        </div>
       </div>
     </section>
   </main>
 
-  <!-- Quality bottom sheet -->
+  <!-- Sound quality sheet -->
   <div class="sheet-backdrop hidden" id="qualitySheet">
     <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="qTitle">
       <div class="grabber"></div>
-      <h3 id="qTitle">Call quality</h3>
-      <p class="muted small">Both sides use the lower of your two choices, so a slow connection on either end stays smooth.</p>
-      <div id="qualityList" class="qlist" role="radiogroup"></div>
+      <div class="sheet-head"><span class="nav-spacer"></span><h3 id="qTitle">Sound quality</h3><button class="nav-btn strong" data-close-sheet>Done</button></div>
+      <div id="qualityList" class="list" role="radiogroup" aria-labelledby="qTitle"></div>
+      <p class="group-foot" id="qualityFoot">Lower quality uses less data and stays smooth on slow internet. If the other person picks lower, you’ll both use theirs.</p>
     </div>
   </div>
 
-  <!-- Output device sheet -->
+  <!-- Speaker sheet -->
   <div class="sheet-backdrop hidden" id="outputSheet">
     <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="oTitle">
       <div class="grabber"></div>
-      <h3 id="oTitle">Audio output</h3>
-      <div id="outputList" class="qlist"></div>
+      <div class="sheet-head"><span class="nav-spacer"></span><h3 id="oTitle">Play sound on</h3><button class="nav-btn strong" data-close-sheet>Done</button></div>
+      <div id="outputList" class="list" role="radiogroup" aria-labelledby="oTitle"></div>
     </div>
   </div>
 
-  <div class="toast hidden" id="toast" role="status"></div>
+  <!-- Privacy check sheet -->
+  <div class="sheet-backdrop hidden" id="privacySheet">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="pTitle">
+      <div class="grabber"></div>
+      <div class="sheet-head"><span class="nav-spacer"></span><h3 id="pTitle">Your call is private</h3><button class="nav-btn strong" data-close-sheet>Done</button></div>
+      <p class="muted">Want to be extra sure? Ask the other person to read out the numbers on their screen. If they match yours, no one else can listen in.</p>
+      <div class="code-big" id="securityCode"></div>
+    </div>
+  </div>
+
+  <div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
   <audio id="remoteAudio" autoplay playsinline></audio>
 </body>
 </html>

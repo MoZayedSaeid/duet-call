@@ -15,8 +15,9 @@ export const DEFAULT_ICE = [
 const MAX_AUTO = 3; // Auto never goes above HD; Studio is opt-in
 
 export class Call extends EventTarget {
-  constructor({ quality = AUTO, audio = {}, iceServers = DEFAULT_ICE, brokers } = {}) {
+  constructor({ quality = AUTO, audio = {}, iceServers = DEFAULT_ICE, brokers, name = '' } = {}) {
     super();
+    this.name = name;
     this.mode = quality;
     this.autoLevel = initialAutoLevel();
     this.peerLevel = PRESETS.length - 1;
@@ -147,7 +148,10 @@ export class Call extends EventTarget {
     this.pc = pc;
     this.dc = pc.createDataChannel('ctl', { negotiated: true, id: 0 });
     this.dc.onmessage = (e) => { try { this.onSignal(JSON.parse(e.data), 'p2p'); } catch {} };
-    this.dc.onopen = () => this.send({ type: 'pref', lvl: this.myLevel });
+    this.dc.onopen = () => {
+      this.send({ type: 'pref', lvl: this.myLevel });
+      if (this.name) this.send({ type: 'name', name: this.name });
+    };
 
     if (this.offerer) {
       const t = pc.addTransceiver(this.track, { direction: 'sendrecv', streams: [this.localStream] });
@@ -241,12 +245,9 @@ export class Call extends EventTarget {
     } catch {}
     const names = { host: 'local', srflx: 'public', prflx: 'public', relay: 'TURN relay' };
     const list = (set) => [...set].map((t) => names[t] || t).filter((v, i, a) => a.indexOf(v) === i).join(', ') || 'none';
-    const hasRelay = local.has('relay') || remote.has('relay');
-    const why = hasRelay
-      ? 'Even the TURN relay could not be reached. Check the TURN address and credentials.'
-      : !remote.size
-        ? 'No network routes arrived from the other side. Their network may block WebRTC, or the call setup was cut off.'
-        : 'Both networks block direct connections (common on mobile data and office Wi-Fi). Add a TURN relay on either side to fix it: Settings → TURN relay.';
+    const why = !remote.size
+      ? 'We couldn’t reach the other person. Ask them to reload the page, or try switching between Wi-Fi and mobile data.'
+      : 'One of your networks is blocking the call. Try switching between Wi-Fi and mobile data.';
     return { message: why, detail: `Your routes: ${list(local)} · their routes: ${list(remote)} · ${pairs} paths tried` };
   }
 
@@ -324,7 +325,7 @@ export class Call extends EventTarget {
         }
         break;
       case 'busy':
-        if (!this.peer) this.setState('failed', { message: 'This call already has two people in it.' });
+        if (!this.peer) this.setState('failed', { message: 'Two people are already on this call. Start a new one instead.' });
         break;
       case 'sdp':
         await this.onRemoteSdp(m.sdp);
@@ -339,6 +340,9 @@ export class Call extends EventTarget {
         break;
       case 'mute':
         this.emit('peermute', !!m.on);
+        break;
+      case 'name':
+        if (typeof m.name === 'string') this.emit('peername', m.name.trim().slice(0, 40));
         break;
       case 'bye':
         this.end('remote');

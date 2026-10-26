@@ -3,11 +3,11 @@
 // mean fewer packet headers, which matters a lot on slow links (at 20 ms the
 // IP/UDP/RTP headers alone cost ~16 kbps; at 60 ms only ~5 kbps).
 export const PRESETS = [
-  { id: 'ultra',    name: 'Ultra low', hint: '2G / very slow',   kbps: 8,  rate: 8000,  ptime: 60, dtx: 1, fec: 1 },
-  { id: 'saver',    name: 'Data saver', hint: '3G / weak signal', kbps: 14, rate: 16000, ptime: 40, dtx: 1, fec: 1 },
-  { id: 'balanced', name: 'Balanced',  hint: 'Most connections', kbps: 24, rate: 24000, ptime: 20, dtx: 1, fec: 1 },
-  { id: 'hd',       name: 'HD voice',  hint: 'Wi-Fi / 4G',       kbps: 40, rate: 48000, ptime: 20, dtx: 1, fec: 1 },
-  { id: 'studio',   name: 'Studio',    hint: 'Fast & stable',    kbps: 96, rate: 48000, ptime: 20, dtx: 0, fec: 1 },
+  { id: 'ultra',    name: 'Lowest data', hint: 'For very slow internet',       kbps: 8,  rate: 8000,  ptime: 60, dtx: 1, fec: 1 },
+  { id: 'saver',    name: 'Data saver',  hint: 'For a weak signal',            kbps: 14, rate: 16000, ptime: 40, dtx: 1, fec: 1 },
+  { id: 'balanced', name: 'Standard',    hint: 'Good on most connections',     kbps: 24, rate: 24000, ptime: 20, dtx: 1, fec: 1 },
+  { id: 'hd',       name: 'High',        hint: 'Clear voice on Wi-Fi or 4G',   kbps: 40, rate: 48000, ptime: 20, dtx: 1, fec: 1 },
+  { id: 'studio',   name: 'Best',        hint: 'Richest sound on fast Wi-Fi',  kbps: 96, rate: 48000, ptime: 20, dtx: 0, fec: 1 },
 ];
 
 export const AUTO = 'auto';
