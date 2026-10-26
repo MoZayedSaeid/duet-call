@@ -32,7 +32,11 @@ Both sides automatically use the **lower** of their two choices, so one slow pho
 ## Limits
 
 - **Two people per call.**
-- **Strict networks.** About 10–15% of networks (some corporate firewalls, some carrier NATs) block direct P2P traffic. On those, a TURN relay is needed. You can enter your own TURN server under Settings. TURN still can't decrypt the audio.
+- **Strict networks.** Some network pairs block direct P2P traffic, most often a phone on mobile data (carrier NAT) or an office firewall. On those, a TURN relay is needed. TURN only forwards the encrypted audio and can't decrypt it, and only **one** side of the call needs it. You can add one in two places:
+  - **For everyone:** put credentials in [`js/config.js`](js/config.js). Free tiers include [ExpressTURN](https://www.expressturn.com) and [Metered](https://www.metered.ca/tools/openrelay/).
+  - **Just for you:** use Settings → TURN relay in the app.
+
+  When a call can't connect, the app retries once, then shows which routes each side found and why the call failed.
 - **Public brokers and STUN.** The app uses Google and Cloudflare STUN servers and public MQTT brokers to find the other person. They never carry audio, and they only see encrypted setup data. If you need zero third parties at all, use Private mode. Note that STUN is still used there to find your public address.
 
 ## Deploy

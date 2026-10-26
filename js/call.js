@@ -4,10 +4,12 @@
 import { Room } from './signaling.js';
 import { PRESETS, AUTO, levelOf, mungeSdp, preferOpus, initialAutoLevel, estimateKbps } from './quality.js';
 import { compress, decompress, securityCode, fingerprintOf, randomId } from './util.js';
+import { TURN_SERVERS } from './config.js';
 
 export const DEFAULT_ICE = [
   { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
   { urls: 'stun:stun.cloudflare.com:3478' },
+  ...TURN_SERVERS,
 ];
 
 const MAX_AUTO = 3; // Auto never goes above HD; Studio is opt-in
@@ -160,11 +162,20 @@ export class Call extends EventTarget {
       this.remoteStream = stream;
       this.emit('remote', stream);
     };
+    this.armConnectTimeout();
     pc.onconnectionstatechange = () => this.onConnState();
     pc.oniceconnectionstatechange = () => {
       // Safari reports some transitions only here
       if (!pc.connectionState) this.onConnState(pc.iceConnectionState);
     };
+  }
+
+  // Browsers can sit in "connecting" forever if no usable route ever shows up.
+  armConnectTimeout() {
+    clearTimeout(this._connectTimer);
+    this._connectTimer = setTimeout(() => {
+      if (!this.everConnected && this.pc && this.state !== 'ended') this.onConnState('failed');
+    }, 25000);
   }
 
   attachTrackAsAnswerer() {
@@ -181,6 +192,7 @@ export class Call extends EventTarget {
     if (s === 'connected' || s === 'completed') {
       clearTimeout(this._restartTimer);
       clearTimeout(this._lostTimer);
+      clearTimeout(this._connectTimer);
       if (!this.everConnected) {
         this.everConnected = true;
         this.connectedAt = Date.now();
@@ -193,7 +205,17 @@ export class Call extends EventTarget {
       this.applyEffective(true);
     } else if (s === 'disconnected' || s === 'failed') {
       if (!this.everConnected) {
-        if (s === 'failed') this.setState('failed', 'Could not connect directly. A TURN server may be needed on very strict networks (Settings → TURN).');
+        if (s !== 'failed') return;
+        if (!this._retried && !this.manual) {
+          // One ICE restart: recovers lost candidates or a slow network.
+          this._retried = true;
+          this.setState('retrying');
+          this.armConnectTimeout();
+          if (this.offerer) this.negotiate(true);
+          else this.send({ type: 'restart' });
+          return;
+        }
+        this.setState('failed', await this.diagnose());
         return;
       }
       this.setState('reconnecting');
@@ -204,6 +226,28 @@ export class Call extends EventTarget {
         if (this.state === 'reconnecting') this.end('lost');
       }, 45000);
     }
+  }
+
+  // Explain WHY the direct connection failed, from the candidates both sides found.
+  async diagnose() {
+    const local = new Set(), remote = new Set();
+    let pairs = 0;
+    try {
+      (await this.pc.getStats()).forEach((x) => {
+        if (x.type === 'local-candidate') local.add(x.candidateType);
+        else if (x.type === 'remote-candidate') remote.add(x.candidateType);
+        else if (x.type === 'candidate-pair') pairs++;
+      });
+    } catch {}
+    const names = { host: 'local', srflx: 'public', prflx: 'public', relay: 'TURN relay' };
+    const list = (set) => [...set].map((t) => names[t] || t).filter((v, i, a) => a.indexOf(v) === i).join(', ') || 'none';
+    const hasRelay = local.has('relay') || remote.has('relay');
+    const why = hasRelay
+      ? 'Even the TURN relay could not be reached. Check the TURN address and credentials.'
+      : !remote.size
+        ? 'No network routes arrived from the other side. Their network may block WebRTC, or the call setup was cut off.'
+        : 'Both networks block direct connections (common on mobile data and office Wi-Fi). Add a TURN relay on either side to fix it: Settings → TURN relay.';
+    return { message: why, detail: `Your routes: ${list(local)} · their routes: ${list(remote)} · ${pairs} paths tried` };
   }
 
   iceRestart() {
@@ -280,7 +324,7 @@ export class Call extends EventTarget {
         }
         break;
       case 'busy':
-        if (!this.peer) this.setState('failed', 'This call already has two people in it.');
+        if (!this.peer) this.setState('failed', { message: 'This call already has two people in it.' });
         break;
       case 'sdp':
         await this.onRemoteSdp(m.sdp);
@@ -341,6 +385,8 @@ export class Call extends EventTarget {
     this.peer = null;
     this.pendingIce = [];
     this._lastOffer = null;
+    this._retried = false;
+    clearTimeout(this._connectTimer);
     this.everConnected = false;
     this.effLevel = null;
     this._prev = null;
@@ -470,6 +516,7 @@ export class Call extends EventTarget {
     const bytes = this.stats.bytes || 0;
     clearInterval(this._helloTimer);
     clearInterval(this._statsTimer);
+    clearTimeout(this._connectTimer);
     clearTimeout(this._restartTimer);
     clearTimeout(this._lostTimer);
     this.setState('ended', { reason, duration, bytes });

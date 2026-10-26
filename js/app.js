@@ -210,8 +210,11 @@ function onState({ state, info }) {
       $('callStatus').textContent = 'Reconnecting…';
       $('bars').dataset.n = '1';
       break;
+    case 'retrying':
+      $('callStatus').textContent = 'Trying another route…';
+      break;
     case 'failed':
-      endUi('Couldn’t connect', info || 'The connection could not be established.');
+      endUi('Couldn’t connect', info?.message || 'The connection could not be established.', info?.detail);
       call.end('failed');
       break;
     case 'ended': {
@@ -226,7 +229,9 @@ function onState({ state, info }) {
   }
 }
 
-function endUi(title, detail) {
+function endUi(title, detail, diag) {
+  $('endDiag').textContent = diag || '';
+  $('endDiag').classList.toggle('hidden', !diag);
   clearInterval(timerInt);
   cancelAnimationFrame(meterRaf);
   releaseWake();
