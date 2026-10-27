@@ -312,6 +312,13 @@
           <span class="disc"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z" /><path d="M16 9a3 3 0 0 1 0 6M18.5 6.5a7 7 0 0 1 0 11" /></svg></span>
           <span>Speaker</span>
         </button>
+        <button class="ctl" id="chatBtn">
+          <span class="disc">
+            <svg viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.6L3 20.5l1.4-5A8.5 8.5 0 1 1 21 11.5z" /></svg>
+            <span class="badge hidden" id="chatBadge" aria-hidden="true"></span>
+          </span>
+          <span>Message</span>
+        </button>
         <button class="ctl" data-open-quality>
           <span class="disc"><svg viewBox="0 0 24 24"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4" /></svg></span>
           <span data-quality-short>Quality</span>
@@ -348,6 +355,21 @@
       <div class="sheet-head"><span class="nav-spacer"></span><h3 id="qTitle">Sound quality</h3><button class="nav-btn strong" data-close-sheet>Done</button></div>
       <div id="qualityList" class="list" role="radiogroup" aria-labelledby="qTitle"></div>
       <p class="group-foot" id="qualityFoot">Lower quality uses less data and stays smooth on slow internet. If the other person picks lower, you’ll both use theirs.</p>
+    </div>
+  </div>
+
+  <!-- Messages sheet -->
+  <div class="sheet-backdrop hidden" id="chatSheet">
+    <div class="sheet chat" role="dialog" aria-modal="true" aria-labelledby="cTitle">
+      <div class="grabber"></div>
+      <div class="sheet-head"><span class="nav-spacer"></span><h3 id="cTitle">Messages</h3><button class="nav-btn strong" data-close-sheet>Done</button></div>
+      <div class="chat-log" id="chatLog" aria-live="polite">
+        <p class="chat-empty" id="chatEmpty">Messages go straight to the other person, locked like your call. They disappear when the call ends.</p>
+      </div>
+      <div class="composer">
+        <textarea id="chatInput" rows="1" maxlength="2000" placeholder="Message" enterkeyhint="send" aria-label="Message"></textarea>
+        <button class="send-btn" id="chatSend" aria-label="Send" disabled><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6" /></svg></button>
+      </div>
     </div>
   </div>
 

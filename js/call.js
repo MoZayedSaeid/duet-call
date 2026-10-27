@@ -67,6 +67,12 @@ export class Call extends EventTarget {
     }
   }
 
+  // Text messages ride the same encrypted channel as call setup: the P2P
+  // data channel once connected, the encrypted relay before that.
+  sendChat(id, text) {
+    this.send({ type: 'chat', id, text });
+  }
+
   setMuted(muted) {
     if (this.track) this.track.enabled = !muted;
     this.muted = muted;
@@ -340,6 +346,15 @@ export class Call extends EventTarget {
         break;
       case 'mute':
         this.emit('peermute', !!m.on);
+        break;
+      case 'chat':
+        if (typeof m.id === 'string' && typeof m.text === 'string') {
+          this.send({ type: 'chat-ack', id: m.id });
+          this.emit('chat', { id: m.id.slice(0, 32), text: m.text.slice(0, 2000) });
+        }
+        break;
+      case 'chat-ack':
+        if (typeof m.id === 'string') this.emit('chatack', m.id);
         break;
       case 'name':
         if (typeof m.name === 'string') this.emit('peername', m.name.trim().slice(0, 40));

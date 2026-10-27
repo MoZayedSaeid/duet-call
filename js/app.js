@@ -1,6 +1,6 @@
 import { Call, DEFAULT_ICE } from './call.js';
 import { PRESETS, AUTO, levelOf, mbPerHour } from './quality.js';
-import { newRoomCode, fmtDuration, fmtBytes } from './util.js';
+import { newRoomCode, fmtDuration, fmtBytes, randomId } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 const $$ = (sel) => document.querySelectorAll(sel);
@@ -198,7 +198,10 @@ function renderQualityList() {
 }
 
 function openSheet(id) { $(id).classList.remove('hidden'); }
-function closeSheets() { $$('.sheet-backdrop').forEach((s) => s.classList.add('hidden')); }
+function closeSheets() {
+  $$('.sheet-backdrop').forEach((s) => s.classList.add('hidden'));
+  $('chatInput').blur();
+}
 $$('.sheet-backdrop').forEach((s) => s.addEventListener('click', (e) => { if (e.target === s) closeSheets(); }));
 $$('[data-close-sheet]').forEach((b) => b.addEventListener('click', closeSheets));
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheets(); });
@@ -240,6 +243,8 @@ function newCall() {
   c.addEventListener('stats', (e) => renderStats(e.detail));
   c.addEventListener('peermute', (e) => $('peerMuted').classList.toggle('hidden', !e.detail));
   c.addEventListener('peername', (e) => setPeerName(e.detail));
+  c.addEventListener('chat', (e) => receiveChat(e.detail));
+  c.addEventListener('chatack', (e) => markDelivered(e.detail));
   c.addEventListener('relays', (e) => {
     if (c.state === 'waiting') setLobbyStatus(!!e.detail);
   });
@@ -253,7 +258,10 @@ function setLobbyStatus(ready) {
   $('lobbyDot').classList.toggle('ok', ready);
 }
 
+let peerDisplayName = '';
 function setPeerName(name) {
+  peerDisplayName = name;
+  $('cTitle').textContent = name || 'Messages';
   const ini = name ? initials(name) : '';
   $('peerName').textContent = name || 'Voice call';
   $('peerInitials').textContent = ini;
@@ -262,6 +270,7 @@ function setPeerName(name) {
 }
 
 function resetCallUi() {
+  resetChat();
   $('securityRow').classList.add('hidden');
   $('peerMuted').classList.add('hidden');
   $('callStatus').textContent = 'Connecting…';
@@ -358,6 +367,125 @@ function renderStats(s) {
   $('sRate').textContent = `${Math.round(s.kbpsOut)} / ${Math.round(s.kbpsIn)} kbps`;
   $('sData').textContent = fmtBytes(s.bytes);
 }
+
+// ---------- messages ----------
+
+let unread = 0;
+const seenMsgs = new Set();
+const pendingMsgs = new Map(); // id -> "not delivered" timer
+const chatOpen = () => !$('chatSheet').classList.contains('hidden');
+
+function resetChat() {
+  $$('#chatLog .msg').forEach((m) => m.remove());
+  $('chatEmpty').classList.remove('hidden');
+  $('chatInput').value = '';
+  growInput();
+  seenMsgs.clear();
+  pendingMsgs.forEach(clearTimeout);
+  pendingMsgs.clear();
+  setUnread(0);
+}
+
+function setUnread(n) {
+  unread = n;
+  $('chatBadge').textContent = n > 9 ? '9+' : String(n);
+  $('chatBadge').classList.toggle('hidden', !n);
+  $('chatBtn').setAttribute('aria-label', n ? `Message, ${n} unread` : 'Message');
+}
+
+function addMsg(text, mine, id) {
+  $('chatEmpty').classList.add('hidden');
+  const log = $('chatLog');
+  const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+  const el = document.createElement('div');
+  el.className = 'msg ' + (mine ? 'me' : 'them');
+  el.dataset.id = id;
+  const bubble = document.createElement('p');
+  bubble.className = 'bubble';
+  bubble.textContent = text;
+  el.appendChild(bubble);
+  if (mine) {
+    const r = document.createElement('span');
+    r.className = 'receipt';
+    r.textContent = 'Sending…';
+    el.appendChild(r);
+  }
+  log.appendChild(el);
+  if (mine || nearBottom) log.scrollTop = log.scrollHeight;
+}
+
+function sendChat() {
+  const text = $('chatInput').value.trim();
+  if (!text) return;
+  if (!call?.peer || call.state === 'ended') return toast('You can send messages once they join');
+  const id = randomId(10);
+  call.sendChat(id, text);
+  addMsg(text, true, id);
+  pendingMsgs.set(id, setTimeout(() => {
+    const el = $('chatLog').querySelector(`.msg[data-id="${CSS.escape(id)}"]`);
+    if (!el) return;
+    el.classList.add('failed');
+    el.querySelector('.receipt').textContent = 'Not delivered';
+  }, 10000));
+  $('chatInput').value = '';
+  growInput();
+  $('chatInput').focus();
+}
+
+function markDelivered(id) {
+  clearTimeout(pendingMsgs.get(id));
+  pendingMsgs.delete(id);
+  const el = $('chatLog').querySelector(`.msg[data-id="${CSS.escape(id)}"]`);
+  if (!el) return;
+  el.classList.remove('failed');
+  el.querySelector('.receipt').textContent = 'Delivered';
+}
+
+function receiveChat({ id, text }) {
+  if (seenMsgs.has(id)) return; // may arrive over both the direct channel and the relay
+  seenMsgs.add(id);
+  addMsg(text, false, id);
+  if (chatOpen() && !document.hidden) return;
+  setUnread(unread + 1);
+  const preview = text.length > 60 ? text.slice(0, 60) + '…' : text;
+  toast(peerDisplayName ? `${peerDisplayName}: ${preview}` : `New message: ${preview}`, 3500);
+  navigator.vibrate?.(30);
+}
+
+function growInput() {
+  const t = $('chatInput');
+  t.style.height = 'auto';
+  t.style.height = Math.min(t.scrollHeight + 2, 120) + 'px';
+  $('chatSend').disabled = !t.value.trim();
+}
+
+// Keep the sheet above the on-screen keyboard (mobile browsers shrink the visual viewport).
+function fitChatToViewport() {
+  const vv = window.visualViewport;
+  const sheet = $('chatSheet');
+  if (!vv || sheet.classList.contains('hidden')) return;
+  sheet.style.top = vv.offsetTop + 'px';
+  sheet.style.height = vv.height + 'px';
+  sheet.style.bottom = 'auto';
+}
+window.visualViewport?.addEventListener('resize', fitChatToViewport);
+window.visualViewport?.addEventListener('scroll', fitChatToViewport);
+
+$('chatBtn').onclick = () => {
+  setUnread(0);
+  openSheet('chatSheet');
+  fitChatToViewport();
+  $('chatLog').scrollTop = $('chatLog').scrollHeight;
+  if (matchMedia('(pointer: fine)').matches) $('chatInput').focus();
+};
+$('chatSend').onclick = sendChat;
+$('chatInput').addEventListener('input', growInput);
+$('chatInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendChat(); }
+});
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && chatOpen()) setUnread(0);
+});
 
 // ---------- level meters (cheap: no remote audio processing) ----------
 

@@ -17,6 +17,7 @@ A static web app for HD voice calls straight between two browsers. There is no b
 - An Apple-style design with **Light**, **Dark** and **Automatic** themes (Automatic follows the device), plus a **Larger text** option.
 - Plain wording everywhere. Connection numbers, routes and data use are hidden unless you turn on **Show technical details** in Settings.
 - An optional **name** is shown to the other person, with their initials on the call screen.
+- **Text messages** during a call. They travel over the same encrypted P2P channel as call control (or the encrypted relay while connecting), show "Delivered" once received, and are never stored: they disappear when the call ends.
 
 ## Quality presets
 
