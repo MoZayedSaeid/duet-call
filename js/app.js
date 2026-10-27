@@ -218,6 +218,7 @@ let timerInt = 0;
 
 function newCall() {
   if (call && call.state !== 'ended') call.end();
+  setLoudspeaker(false); // phones start on the earpiece; must be set before the mic opens
   call = new Call({
     quality: settings.quality,
     audio: { noiseSuppression: settings.ns, echoCancellation: settings.ec, autoGainControl: settings.agc },
@@ -493,9 +494,33 @@ $('muteBtn').onclick = () => {
   $('muteLabel').textContent = m ? 'Unmute' : 'Mute';
 };
 
-const canPickOutput = 'setSinkId' in HTMLMediaElement.prototype;
-if (!canPickOutput) $('speakerBtn').disabled = true;
+// ---------- speaker / earpiece ----------
+// iPhone Safari (iOS 17+): a "play-and-record" audio session plays the call from
+// the top earpiece, like a phone call; "auto" lets Safari use the loudspeaker.
+// Android Chrome always uses the loudspeaker for web calls, and pages can't change it.
+const isIPhone = /iPhone|iPod/.test(navigator.userAgent);
+const isAndroid = /Android/.test(navigator.userAgent);
+const canEarpiece = isIPhone && 'audioSession' in navigator;
+const canPickOutput = !isAndroid && 'setSinkId' in HTMLMediaElement.prototype;
+
+function setLoudspeaker(on) {
+  if (!canEarpiece) return;
+  try { navigator.audioSession.type = on ? 'auto' : 'play-and-record'; } catch {}
+  $('speakerBtn').setAttribute('aria-pressed', String(on));
+}
+
 $('speakerBtn').onclick = async () => {
+  if (canEarpiece) {
+    const on = $('speakerBtn').getAttribute('aria-pressed') !== 'true';
+    setLoudspeaker(on);
+    return toast(on ? 'Speaker on' : 'Speaker off. Hold the phone to your ear.');
+  }
+  if (!canPickOutput) {
+    return toast(isAndroid
+      ? 'Phone browsers always use the loudspeaker for web calls. Use headphones for a private call.'
+      : isIPhone ? 'Update your iPhone to iOS 17 or later to switch between earpiece and speaker.'
+        : 'Your browser chooses the speaker by itself.', 5000);
+  }
   const devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audiooutput');
   const list = $('outputList');
   list.innerHTML = '';
@@ -603,6 +628,7 @@ function route() {
   show('home');
 }
 window.addEventListener('hashchange', () => { if (!call || call.state === 'ended') route(); });
+setLoudspeaker(false);
 applyAppearance();
 renderGreeting();
 renderRelayState();
