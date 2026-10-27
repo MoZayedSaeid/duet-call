@@ -521,6 +521,17 @@ $('speakerBtn').onclick = async () => {
       : isIPhone ? 'Update your iPhone to iOS 17 or later to switch between earpiece and speaker.'
         : 'Your browser chooses the speaker by itself.', 5000);
   }
+  // Firefox only lists speakers after you pick one in its own chooser.
+  if (navigator.mediaDevices.selectAudioOutput) {
+    try {
+      const d = await navigator.mediaDevices.selectAudioOutput(); // must be the first await: needs the tap
+      await $('remoteAudio').setSinkId(d.deviceId);
+      toast(`Playing on ${d.label || 'the chosen speaker'}`);
+    } catch (e) {
+      if (e.name !== 'NotAllowedError' && e.name !== 'AbortError') toast('Couldn’t switch the speaker');
+    }
+    return;
+  }
   const devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audiooutput');
   const list = $('outputList');
   list.innerHTML = '';
